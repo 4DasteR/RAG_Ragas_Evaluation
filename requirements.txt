@@ -4,3 +4,4 @@ dotenv
 langchain_community
 pypdf
 faiss-cpu
+rank_bm25
