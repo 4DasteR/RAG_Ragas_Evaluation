@@ -14,4 +14,6 @@ def provide(base_model: str = BASE_MODEL, embedding_model: str = EMBEDDING_MODEL
     llm = ChatOpenAI(api_key=openai_api_key, model=base_model, temperature=base_temperature)
     embedding_engine = OpenAIEmbeddings(api_key=openai_api_key, model=embedding_model)
 
+    print("OpenAI models provided")
+
     return llm, embedding_engine

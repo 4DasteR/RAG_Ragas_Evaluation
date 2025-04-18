@@ -7,22 +7,14 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 from components.vector_store import load_and_split_documents
-from typing import List
-
+from typing import List, Optional
+from dataclasses import dataclass
+"""Przerobić to na factory design patter i produkować odpowiednie ragi z fabryki"""
 DEFAULT_RETRIEVER_K = 4
 
-
-class SimpleRAG:
-    def __init__(self, vectorstore: FAISS | None, model: ChatOpenAI, k=DEFAULT_RETRIEVER_K):
-        self.vectorstore = vectorstore
-        self.llm = model
-        self.k = k
-        self.retriever = self.build_retriever()
-
-        # Custom prompt template for RAG
-        rag_prompt_template = """
+DEFAULT_PROMPT_TEMPLATE = """
             You are an AI assistant for question-answering tasks. 
-            Use the following pieces of retrieved context to answer the question. 
+            Use the following pieces of retrieved context to answer the question.
             If you don't know the answer, just say that you don't know.
 
             Question: {question}
@@ -32,8 +24,17 @@ class SimpleRAG:
             Answer:
             """
 
-        RAG_PROMPT = PromptTemplate(
-            template=rag_prompt_template,
+
+class SimpleRAG:
+    def __init__(self, vectorstore: FAISS | None, model: ChatOpenAI, prompt_template: str = DEFAULT_PROMPT_TEMPLATE, k=DEFAULT_RETRIEVER_K):
+        self.vectorstore = vectorstore
+        self.llm = model
+        self.k = k
+        self.retriever = self.build_retriever()
+        self.prompt_template = prompt_template
+
+        rag_prompt = PromptTemplate(
+            template=self.prompt_template,
             input_variables=["context", "question"]
         )
 
@@ -41,7 +42,7 @@ class SimpleRAG:
             llm=self.llm,
             chain_type="stuff",
             retriever=self.retriever,
-            chain_type_kwargs={"prompt": RAG_PROMPT},
+            chain_type_kwargs={"prompt": rag_prompt},
             return_source_documents=True
         )
 

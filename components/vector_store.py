@@ -8,7 +8,7 @@ from langchain_core.documents.base import Document
 # Set up default configurations
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200
-
+"""Vector store provider to be added, with updataing on new document"""
 
 def load_and_split_document(file_path: str, chunk_size: int = DEFAULT_CHUNK_SIZE, chunk_overlap: int = DEFAULT_CHUNK_OVERLAP) -> List[Document]:
     """Load a document and split it into chunks"""
@@ -22,7 +22,6 @@ def load_and_split_document(file_path: str, chunk_size: int = DEFAULT_CHUNK_SIZE
 
     # Load the document
     documents = loader.load()
-    print(f"Loaded {len(documents)} document pages/segments")
 
     # Split the document into chunks
     text_splitter = RecursiveCharacterTextSplitter(
@@ -31,7 +30,6 @@ def load_and_split_document(file_path: str, chunk_size: int = DEFAULT_CHUNK_SIZE
         length_function=len
     )
     chunks = text_splitter.split_documents(documents)
-    print(f"Split into {len(chunks)} chunks")
 
     return chunks
 
