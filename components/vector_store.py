@@ -1,46 +1,100 @@
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from typing import List
+from typing import List, Optional, Set, Dict, Type
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents.base import Document
+from langchain_community.retrievers import BM25Retriever
+from langchain_core.vectorstores import VectorStoreRetriever
+from dataclasses import dataclass, field
+from langchain.retrievers import EnsembleRetriever
+from pathlib import Path
+from itertools import chain
+from .logger import Logger
 
-# Set up default configurations
-DEFAULT_CHUNK_SIZE = 1000
-DEFAULT_CHUNK_OVERLAP = 200
-"""Vector store provider to be added, with updataing on new document"""
+logger = Logger()
 
-def load_and_split_document(file_path: str, chunk_size: int = DEFAULT_CHUNK_SIZE, chunk_overlap: int = DEFAULT_CHUNK_OVERLAP) -> List[Document]:
-    """Load a document and split it into chunks"""
-    # Determine loader based on file extension
-    if file_path.endswith(".pdf"):
-        loader = PyPDFLoader(file_path)
-    elif file_path.endswith(".txt"):
-        loader = TextLoader(file_path)
-    else:
-        raise ValueError(f"Unsupported file type: {file_path}")
+@dataclass
+class VectorStoreProvider:
+    embedding_model: OpenAIEmbeddings
+    k: int = 4
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    weight_dense: float = 0.5
+    weight_sparse: float = 0.5
+    documents_path: Path = Path("documents")
+    __dense_retriever: Optional[VectorStoreRetriever] = field(default=None, init=False)
+    __sparse_retriever: Optional[BM25Retriever] = field(default=None, init=False)
+    __cached_documents: Set[Path] = field(default_factory=set, init=False)
+    __loaders: Dict[str, Type] = field(init=False, default_factory=lambda: {
+        ".pdf": PyPDFLoader,
+        ".txt": TextLoader
+    })
+    
+    def __post_init__(self):
+        self.documents_path.mkdir(exist_ok=True)
+        self.__cached_documents_changed()
+    
+    @property
+    def __document_paths(self) -> Set[Path]:
+        return set(self.documents_path.glob("*.*"))
+        
+    def __cached_documents_changed(self) -> bool:
+        current = self.__document_paths
+        if current != self.__cached_documents:
+            logger.log("Documents changed. Updating cache...")
+            self.__cached_documents = current
+            self.__dense_retriever = None
+            self.__sparse_retriever = None
+            return True
+        return False
+            
+    def __validate_document(self, path: Path) -> bool:
+        return path.exists() and path.is_file() and path.stat().st_size > 0
+    
+    def __load_and_split_document(self, path: Path) -> List[Document]:
+        if not self.__validate_document(path):
+                raise ValueError(f"Invalid document: {path}")
 
-    # Load the document
-    documents = loader.load()
+        suffix = path.suffix
+        if suffix not in self.__loaders.keys():
+            raise ValueError(f"Unsupported file type: {path}")
+        
+        documents = self.__loaders[suffix](str(path)).load()
 
-    # Split the document into chunks
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=len
-    )
-    chunks = text_splitter.split_documents(documents)
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            length_function=len
+        )
+        
+        return text_splitter.split_documents(documents)
 
-    return chunks
-
-
-def load_and_split_documents(file_paths: List[str], chunk_size=DEFAULT_CHUNK_SIZE, chunk_overlap=DEFAULT_CHUNK_OVERLAP) -> List[Document]:
-    return sum([load_and_split_document(document, chunk_size, chunk_overlap) for document in file_paths], [])
-
-
-def create(documents: List[str], embedding_model: OpenAIEmbeddings) -> FAISS:
-    """Create a vector store from document chunks"""
-    chunks = load_and_split_documents(documents)
-    vectorstore = FAISS.from_documents(chunks, embedding_model)
-    print(f"Created vector store with {len(chunks)} documents")
-    return vectorstore
+    def __load_and_split_documents(self) -> List[Document]:
+        return list(chain.from_iterable(self.__load_and_split_document(doc) for doc in self.__cached_documents))
+    
+    @property
+    def dense_retriever(self) -> VectorStoreRetriever:
+        if not self.__dense_retriever or self.__cached_documents_changed():
+            logger.log("Building dense retriever...")
+            chunks = self.__load_and_split_documents()
+            vectorstore = FAISS.from_documents(chunks, self.embedding_model)
+            self.__dense_retriever = vectorstore.as_retriever(search_kwargs={"k": self.k})
+            logger.log("Build complete.")
+        return self.__dense_retriever
+    
+    @property
+    def sparse_retriever(self) -> BM25Retriever:
+        if not self.__sparse_retriever or self.__cached_documents_changed():
+            logger.log("Building sparse retriever...")
+            chunks = self.__load_and_split_documents()
+            self.__sparse_retriever = BM25Retriever.from_documents(chunks)
+            logger.log("Build complete.")
+        return self.__sparse_retriever
+    
+    @property
+    def ensemble_retriever(self) -> EnsembleRetriever:
+        return EnsembleRetriever(
+            retrievers=[self.dense_retriever, self.sparse_retriever],
+            weights=[self.weight_dense, self.weight_sparse]
+        )

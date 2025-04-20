@@ -1,3 +1,5 @@
 .env
 /venv
-RAG_data/*
+documents/*
+results/*
+components/__pycache__/*
