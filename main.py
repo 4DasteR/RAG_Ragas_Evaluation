@@ -2,14 +2,13 @@ from components import openai_model
 from components.vector_store import VectorStoreProvider
 from components.rag_chain import *
 from components.evaluator import Evaluator
+from components.query_builder import QueryBuilder, Query
 import pandas as pd
 from dotenv import load_dotenv
 
 
 if __name__ == "__main__":
     load_dotenv()
-    # documents = [f"documents/{f}" for f in os.listdir('documents')]
-
     """Start Rag pipeline"""
     llm, embedding_engine = openai_model.provide()
     vectorstore_provider = VectorStoreProvider(embedding_engine)
@@ -39,20 +38,22 @@ if __name__ == "__main__":
              'java programming and know about different association types.',
              'java programming and know about different inheritance types.']
     
-    for i, query in enumerate(test_queries):
-        engineered_queries.append({
-            "zero_shot": query + "\n" + prompt_techniques["zero_shot"],
-            "chain_of_thought": query + "\n" + prompt_techniques["chain_of_thought"],
-            "role_prompting": prompt_techniques["role_prompting"]
-                              + f"{roles[i]}"
-                              + "\n" + query
-        })
-
     ground_truth_answers = [
         "Perceptron is the mathematical model of a neuron which outputs a true or false result via a dot product of weight vector and input vector by deciding whether it crosses the threshold or not.",
         "You can implement composition either via normal association with private setter on part and also proper rules od adding method of the whole, or by utilizing inner class wtih private constructor and static method for creation of part.",
         "You can implement overlapping inheritance in java either via flattening of the hierarchy or composition of cardinality one-to-zero between all subclasses."
     ]
+    
+    for i, query in enumerate(test_queries):
+        engineered_queries.append((
+            QueryBuilder()
+            .text(query)
+            .ground_truth_answer(ground_truth_answers[i])
+            .zero_shot()
+            .chain_of_thought()
+            .role_prompting(roles[i])
+            .build().prompt_engineered_text         
+        ))
 
     discriminator = openai_model.provide(base_temperature=0.3)[0]
     rags_eval = dict()

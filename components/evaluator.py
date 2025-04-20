@@ -73,6 +73,7 @@ class Evaluator:
         logger.log(f"Evaluating dataset for {type(self.rag).__name__}...")
         results = dict()
         for i, evaluation_dataset in enumerate(self.evaluation_datasets):
+            logger.log(f"Evaluating Q{i + 1}...")
             results[f"Q{i + 1}"] = evaluate(
                 dataset=evaluation_dataset,
                 metrics=[
@@ -81,6 +82,7 @@ class Evaluator:
                     FactualCorrectness()
                 ],
                 llm=self.discriminator,
+                show_progress = False,
             ).to_pandas()
         self.__evaluation_results = results
         logger.log("Evaluation complete.")

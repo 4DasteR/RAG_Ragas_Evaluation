@@ -25,22 +25,23 @@ class VectorStoreProvider:
     documents_path: Path = Path("documents")
     __dense_retriever: Optional[VectorStoreRetriever] = field(default=None, init=False)
     __sparse_retriever: Optional[BM25Retriever] = field(default=None, init=False)
-    __cached_documents: Set[Path] = field(default_factory=set, init=False)
+    __cached_documents: Dict[Path, float] = field(default_factory=dict, init=False)
     __loaders: Dict[str, Type] = field(init=False, default_factory=lambda: {
         ".pdf": PyPDFLoader,
         ".txt": TextLoader
     })
     
     def __post_init__(self):
+        logger.log("Vector store provider created.")
         self.documents_path.mkdir(exist_ok=True)
-        self.__cached_documents_changed()
+        self.__documents_changed_check()
     
     @property
     def __document_paths(self) -> Set[Path]:
         return set(self.documents_path.glob("*.*"))
         
-    def __cached_documents_changed(self) -> bool:
-        current = self.__document_paths
+    def __documents_changed_check(self) -> bool:
+        current = {path: path.stat().st_mtime for path in self.__document_paths}
         if current != self.__cached_documents:
             logger.log("Documents changed. Updating cache...")
             self.__cached_documents = current
@@ -54,13 +55,14 @@ class VectorStoreProvider:
     
     def __load_and_split_document(self, path: Path) -> List[Document]:
         if not self.__validate_document(path):
-                raise ValueError(f"Invalid document: {path}")
+                raise FileNotFoundError(f"Invalid document file: {path}")
 
         suffix = path.suffix
-        if suffix not in self.__loaders.keys():
-            raise ValueError(f"Unsupported file type: {path}")
+        loader = self.__loaders.get(path.suffix)
+        if not loader:
+            raise ValueError(f"Unsupported file type: {suffix}")
         
-        documents = self.__loaders[suffix](str(path)).load()
+        documents = loader(str(path)).load()
 
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
@@ -71,11 +73,13 @@ class VectorStoreProvider:
         return text_splitter.split_documents(documents)
 
     def __load_and_split_documents(self) -> List[Document]:
-        return list(chain.from_iterable(self.__load_and_split_document(doc) for doc in self.__cached_documents))
+        if not hasattr(self, '__split_documents') or self.__documents_changed_check():
+                self.__split_documents = list(chain.from_iterable(self.__load_and_split_document(doc) for doc in self.__cached_documents))
+        return self.__split_documents
     
     @property
     def dense_retriever(self) -> VectorStoreRetriever:
-        if not self.__dense_retriever or self.__cached_documents_changed():
+        if not self.__dense_retriever or self.__documents_changed_check():
             logger.log("Building dense retriever...")
             chunks = self.__load_and_split_documents()
             vectorstore = FAISS.from_documents(chunks, self.embedding_model)
@@ -85,7 +89,7 @@ class VectorStoreProvider:
     
     @property
     def sparse_retriever(self) -> BM25Retriever:
-        if not self.__sparse_retriever or self.__cached_documents_changed():
+        if not self.__sparse_retriever or self.__documents_changed_check():
             logger.log("Building sparse retriever...")
             chunks = self.__load_and_split_documents()
             self.__sparse_retriever = BM25Retriever.from_documents(chunks)

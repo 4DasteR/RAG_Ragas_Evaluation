@@ -12,17 +12,16 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel
 from abc import ABC
 
-DEFAULT_PROMPT_TEMPLATE = """
-            You are an AI assistant for question-answering tasks. 
-            Use the following pieces of retrieved context to answer the question.
-            If you don't know the answer, just say that you don't know.
+DEFAULT_PROMPT_TEMPLATE = """You are an AI assistant for question-answering tasks.
+Use the following pieces of retrieved context to answer the question.
+If you don't know the answer, just say that you don't know.
 
-            QUESTION: {question}
+QUESTION: {question}
 
-            CONTEXT: {context}
+CONTEXT: {context}
 
-            Answer:
-            """
+Answer:"""
+
         
 logger = Logger()
             
@@ -47,6 +46,7 @@ class RAG(ABC):
     __last_retriever_hash: int = field(default=-1, init=False)
     
     def __post_init__(self):
+        logger.log(f"Created {type(self).__name__}.")
         self.__rag_prompt = PromptTemplate(
             template=self.prompt_template,
             input_variables=["context", "question"]
