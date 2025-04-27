@@ -1,16 +1,15 @@
-from components import openai_model
-from components.vector_store import VectorStoreProvider
-from components.rag_chain import *
-from components.evaluator import Evaluator
-from components.query_builder import QueryBuilder, Query
-import pandas as pd
 from dotenv import load_dotenv
 
+from components.evaluator import Evaluator
+from components.query_builder import QueryBuilder, Query
+from components.rag_chain import *
+from components.models_provider import LLMFactory, provide_openai_embeddings
 
 if __name__ == "__main__":
     load_dotenv()
-    """Start Rag pipeline"""
-    llm, embedding_engine = openai_model.provide()
+    
+    llm = LLMFactory.openai()
+    embedding_engine = provide_openai_embeddings()
     vectorstore_provider = VectorStoreProvider(embedding_engine)
     
     rags = {
@@ -32,11 +31,11 @@ if __name__ == "__main__":
         "How do you implement an overlapping inheritance in java?"
     ]
 
-    engineered_queries: list[dict[str, str]] = []
+    engineered_queries: List[Query] = []
     
-    roles = ['machine learning basis and algorithmic matters.',
-             'java programming and know about different association types.',
-             'java programming and know about different inheritance types.']
+    roles = ['machine learning basis and algorithmic matters',
+             'java programming and know about different association types',
+             'java programming and know about different inheritance types']
     
     ground_truth_answers = [
         "Perceptron is the mathematical model of a neuron which outputs a true or false result via a dot product of weight vector and input vector by deciding whether it crosses the threshold or not.",
@@ -52,32 +51,15 @@ if __name__ == "__main__":
             .zero_shot()
             .chain_of_thought()
             .role_prompting(roles[i])
-            .build().prompt_engineered_text         
+            # .self_consistency()
+            # .directional_stimulus(["Check your answer carefully.", "Check provided context."])
+            .build()         
         ))
-
-    discriminator = openai_model.provide(base_temperature=0.3)[0]
-    rags_eval = dict()
-    for (rag_name, rag_instance) in rags.items():
-        evaluator = Evaluator(rag_instance, discriminator, engineered_queries, ground_truth_answers)
-        rags_eval[rag_name] = evaluator.evaluate()
-        evaluator.save_to_json()
         
     metrics = ['context_recall', 'faithfulness', 'factual_correctness(mode=f1)']
-    for rag_name, eval_res in rags_eval.items():
-        print(f"\nSummary for: {rag_name}")
 
-        # Create a dictionary to hold per-metric, per-question mean values
-        summary = {}
-
-        # Iterate over questions
-        for q_n, df in eval_res.items():
-            means = df[metrics].mean()  # Mean of each metric in the DataFrame
-            for metric, val in means.items():
-                summary.setdefault(metric, {})[q_n] = val  # Fill metric row with question value
-
-        # Create summary DataFrame
-        summary_df = pd.DataFrame(summary).T  # Metrics as rows
-        summary_df.index.name = "Metric"
-        summary_df = summary_df.reset_index()
-
-        print(summary_df)
+    discriminator = LLMFactory.openai(temperature=0.3)
+    test_q = QueryBuilder().text("What is a perceptron?").ground_truth_answer(ground_truth_answers[0]).zero_shot().chain_of_thought().build()
+    evaluator = Evaluator(rags['simple'], discriminator, [test_q])
+    res = evaluator.evaluate()
+    print(res)

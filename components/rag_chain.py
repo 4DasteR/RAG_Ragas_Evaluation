@@ -1,16 +1,20 @@
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-from langchain.retrievers.document_compressors import LLMChainExtractor
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain_core.retrievers import BaseRetriever
-from langchain_core.documents.base import Document
-from langchain_openai import ChatOpenAI
-from typing import Optional, Union, List, Callable, Dict
-from .vector_store import VectorStoreProvider
-from .logger import Logger
-from dataclasses import dataclass, field
-from pydantic import BaseModel
 from abc import ABC
+from dataclasses import dataclass, field
+from typing import Optional, Union, List, Callable, Dict
+
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain_core.documents.base import Document
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.language_models.llms import LLM
+from pydantic import BaseModel
+
+from .logger import Logger
+from .query_builder import Query
+from .vector_store import VectorStoreProvider
+from .validation_methods import *
 
 DEFAULT_PROMPT_TEMPLATE = """You are an AI assistant for question-answering tasks.
 Use the following pieces of retrieved context to answer the question.
@@ -26,7 +30,12 @@ Answer:"""
 logger = Logger()
             
 class RetrieverProxy(BaseRetriever, BaseModel):
-    """This class in a proxy for retriever to allow dynamic access to it"""
+    """
+    Proxy class for retriever. Used for dynamic access to actual retriever.
+
+    Attributes:
+        retriever_callable(Callable[[], BaseRetriever]): lambda providing access to actual retriever
+    """
     retriever_callable: Callable[[], BaseRetriever]
     
     def _get_relevant_documents(self, query: str) -> List[Document]:
@@ -39,27 +48,35 @@ class RetrieverProxy(BaseRetriever, BaseModel):
 
 @dataclass
 class RAG(ABC):
-    llm: ChatOpenAI
+    """
+    Abstract class representing a RAG.
+
+    Attributes:
+        llm (LLM): llm model used for querying
+        retriever (BaseRetriever): retriever for vectorstore data
+        prompt_template (str): template of a prompt enriched with query and context from chain
+    """
+    llm: LLM
     retriever: BaseRetriever
     prompt_template: str
     __chain: Optional[RetrievalQA] = field(default=None, init=False)
     __last_retriever_hash: int = field(default=-1, init=False)
     
     def __post_init__(self):
-        logger.log(f"Created {type(self).__name__}.")
+        logger.log(f"Created {type(self).__name__}.", "COMPLETED")
         self.__rag_prompt = PromptTemplate(
             template=self.prompt_template,
             input_variables=["context", "question"]
         )
     
-    def _get_retriever_hash(self) -> int:
+    def __get_retriever_hash(self) -> int:
         return hash(str(self.retriever))
     
     @property
     def chain(self) -> RetrievalQA:
-        current_hash = self._get_retriever_hash()
+        current_hash = self.__get_retriever_hash()
         if self.__chain is None or current_hash != self.__last_retriever_hash:
-            logger.log(f"Creating RAG chain for {type(self).__name__}...")
+            logger.log(f"Creating RAG chain for {type(self).__name__}...", "CREATION")
             self.__chain = RetrievalQA.from_chain_type(
                 llm=self.llm,
                 chain_type="stuff",
@@ -68,12 +85,15 @@ class RAG(ABC):
                 return_source_documents=True
             )
             self.__last_retriever_hash = current_hash
-            logger.log("RAG chain created.")
+            logger.log("RAG chain created.", "COMPLETED")
         return self.__chain
     
-    def query(self, query: str) -> Dict[str, Union[str, List[Document]]]:
-        if len(query.strip()) == 0 or type(query) is not str:
-            raise ValueError("Query must be provided as a nonempty string.")
+    def query(self, query: Union[str, Query]) -> Dict[str, Union[str, List[Document]]]:
+        if isinstance(query, Query):
+            query = query.text
+        
+        if not isinstance(query, str) and len(query.strip()) == 0:
+            raise ValueError("Query must be provided as a nonempty string!")
         
         result = self.chain.invoke(query)
         
@@ -98,18 +118,21 @@ class CompressionRAG(RAG):
             base_retriever=self.retriever
         )
     
-    def _get_retriever_hash(self) -> int:
+    def __get_retriever_hash(self) -> int:
         if hasattr(self.retriever, 'base_retriever'):
             return hash(str(self.retriever.base_retriever))
-        return super()._get_retriever_hash()
+        return super().__get_retriever_hash()
 
 @dataclass
 class HybridRAG(RAG):
     pass
 
 class RAGFactory(ABC):
+    """
+    Factory class used for generating Simple, Compression and Hybrid RAGs.
+    """
     @staticmethod
-    def __validate_inputs(llm: ChatOpenAI, provider: VectorStoreProvider, prompt_template: str):
+    def __validate_inputs(llm: LLM, provider: VectorStoreProvider, prompt_template: str):
         if not llm:
             raise ValueError("LLM must be provided!")
         if not provider:
@@ -119,7 +142,7 @@ class RAGFactory(ABC):
     
     @staticmethod
     def create_simple(
-        llm: ChatOpenAI,
+        llm: LLM,
         provider: VectorStoreProvider,
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE
     ) -> RAG:
@@ -129,7 +152,7 @@ class RAGFactory(ABC):
     
     @staticmethod
     def create_compression(
-        llm: ChatOpenAI,
+        llm: LLM,
         provider: VectorStoreProvider,
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE
     ) -> RAG:
@@ -139,7 +162,7 @@ class RAGFactory(ABC):
     
     @staticmethod
     def create_hybrid(
-        llm: ChatOpenAI,
+        llm: LLM,
         provider: VectorStoreProvider,
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE
     ) -> RAG:

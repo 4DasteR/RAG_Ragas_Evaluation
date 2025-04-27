@@ -1,46 +1,64 @@
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import List, Dict, Optional
+
 import pandas as pd
-from typing import List, Dict
-from .rag_chain import RAG
-from .logger import Logger
-from ragas import EvaluationDataset
+from langchain_openai import ChatOpenAI
+from pandas import DataFrame
 from ragas import EvaluationDataset, evaluate
 from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
-from dataclasses import dataclass, field
-from typing import Optional
-from pandas import DataFrame
-from langchain_openai import ChatOpenAI
-import json
-from pathlib import Path
+
+from .logger import Logger
+from .query_builder import Query
+from .rag_chain import RAG
 
 logger = Logger()
 
 @dataclass
 class Evaluator:
+    """
+    Class representing an evaluator for a query to the RAG.
+
+    Attributes:
+        rag (RAG): reference to RAG system
+        discriminator (ChatOpenAI): llm that will evaluate the query
+        engineered_queries(List[Query]): list of engineered queries for evaluation
+    """
     rag: RAG
     discriminator: ChatOpenAI
-    engineered_queries: List[Dict[str, str]] = field(default_factory=list)
-    ground_truth_answers: List[str] = field(default_factory=list)
+    engineered_queries: List[Query] = field(default_factory=list)
     __results_folder: Path = Path("results")
     __evaluation_results: Optional[Dict[str, DataFrame]] = None
-    __evaluation_list: Optional[List[Dict[str, str]]] = field(default=None, init=False)
+    __evaluation_list: Optional[List[List[Dict[str, str]]]] = field(default=None, init=False)
     __evaluation_datasets: Optional[List[EvaluationDataset]] = field(default=None, init=False)
     
     def __post_init__(self):
+        if not isinstance(self.rag, RAG):
+            raise ValueError("RAG system must be provided!")
+
+        if not isinstance(self.engineered_queries, List) or any([not isinstance(q, Query) for q in self.engineered_queries]):
+            raise ValueError("Engineered queries must be provided as a list of Query objects!")
+
         self.__results_folder.mkdir(exist_ok=True)
-        logger.log(f"Evaluator for {type(self.rag).__name__} created.")
+        logger.log(f"Evaluator for {type(self.rag).__name__} created.", "completed")
     
     @property
-    def evaluation_list(self) -> List:
+    def evaluation_list(self) -> List[List[Dict[str, str]]]:
+        """
+        Returns a list of prepared queries for later use in evaluator
+        """
         if self.__evaluation_list is None:
             self.__evaluation_list = []
-            for idx, en_query in enumerate(self.engineered_queries):
-                query_result: list[dict] = []
-                for name, query in en_query.items():
-                    result = self.rag.query(query)
-                    question = query
+            for idx, query in enumerate(self.engineered_queries):
+                en_query: Dict[str, str] = query.prompt_engineered_text
+                query_result: List[Dict[str, str]] = []
+                for technique, query_str in en_query.items():
+                    result = self.rag.query(query_str)
+                    question = query_str
                     answer = result["answer"]
                     context = [doc.page_content for doc in result["source_documents"]]
-                    ground_truth = self.ground_truth_answers[idx]
+                    ground_truth = query.ground_truth_answer
                     query_result.append({
                         "question": question,
                         "answer": answer,
@@ -51,7 +69,10 @@ class Evaluator:
         return self.__evaluation_list
 
     @property
-    def evaluation_datasets(self) -> List:
+    def evaluation_datasets(self) -> List[EvaluationDataset]:
+        """
+        Converts evaluation list into list of EvaluationDatasets
+        """
         if self.__evaluation_datasets is None:
             self.__evaluation_datasets = []
             for result in self.evaluation_list:
@@ -70,10 +91,16 @@ class Evaluator:
         return self.__evaluation_results
 
     def evaluate(self) -> Dict[str, DataFrame]:
-        logger.log(f"Evaluating dataset for {type(self.rag).__name__}...")
+        """
+        Evaluates provided queries according to RAGAS metrics
+
+        Returns:
+            Dict[str, DataFrame]: key is a number of question in following pattern: Qn and value is pandas dataframe containing the values for EvaluationDataset enriched by the evaluated metrics values.
+        """
+        logger.log(f"Evaluating dataset for {type(self.rag).__name__}...", "EVALUATION")
         results = dict()
         for i, evaluation_dataset in enumerate(self.evaluation_datasets):
-            logger.log(f"Evaluating Q{i + 1}...")
+            logger.log(f"Evaluating Q{i + 1} for {type(self.rag).__name__}...", "QUERY")
             results[f"Q{i + 1}"] = evaluate(
                 dataset=evaluation_dataset,
                 metrics=[
@@ -82,10 +109,10 @@ class Evaluator:
                     FactualCorrectness()
                 ],
                 llm=self.discriminator,
-                show_progress = False,
+                show_progress=False,
             ).to_pandas()
         self.__evaluation_results = results
-        logger.log("Evaluation complete.")
+        logger.log("Evaluation complete.", "COMPLETED")
         return results
     
     def to_dict(self) -> Dict[str, List[Dict[str, str]]]:
@@ -98,6 +125,6 @@ class Evaluator:
         if not path:
             path = f"{self.__results_folder}/{type(self.rag).__name__}_results.json"
         
-        logger.log(f"Saving evalution results for {type(self.rag).__name__}.")
+        logger.log(f"Saving evaluation results for {type(self.rag).__name__}.", "SAVING")
         with open(path, 'w', encoding='utf-8') as file:
             json.dump(self.to_dict(), file, indent=4)

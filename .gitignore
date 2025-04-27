@@ -2,4 +2,8 @@
 /venv
 documents/*
 results/*
-components/__pycache__/*
+components/__pycache__
+gui/elements/__pycache__
+gui/events/__pycache__
+.idea
+results

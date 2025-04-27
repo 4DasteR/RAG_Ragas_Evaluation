@@ -8,3 +8,4 @@ rank_bm25
 pandas
 ragas
 streamlit
+beautifulsoup4
