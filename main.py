@@ -1,9 +1,9 @@
 from dotenv import load_dotenv
 
 from components.evaluator import Evaluator
-from components.query_builder import QueryBuilder, Query
-from components.rag_chain import *
 from components.models_provider import LLMFactory, provide_openai_embeddings
+from components.query_builder import QueryBuilder
+from components.rag_chain import *
 
 if __name__ == "__main__":
     load_dotenv()

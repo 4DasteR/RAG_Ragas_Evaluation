@@ -1,8 +1,8 @@
 import streamlit as st
 from dotenv import load_dotenv
 
-from components import openai_model
 from components.evaluator import Evaluator
+from components.models_provider import *
 from components.rag_chain import *
 from gui.elements.nav_menu import provide_sidebar
 from gui.elements.techniques_menu import provide_techniques_menu
@@ -27,7 +27,8 @@ def main():
         st.session_state.rags_instances = {}
     
     if not st.session_state.llm or not st.session_state.embedding:
-        st.session_state.llm, st.session_state.embedding = openai_model.provide()
+        st.session_state.llm = LLMFactory.openai()
+        st.session_state.embedding = provide_openai_embeddings()
         
     llm = st.session_state.llm
     embedding_model = st.session_state.embedding
@@ -105,7 +106,7 @@ def main():
     st.markdown('### Query evaluation for RAGs')
     if st.button('Evaluate query', icon=Logger.JOB_ICONS['EVALUATION'], disabled=(not can_evaluate)):
         if not st.session_state.discriminator:
-            st.session_state.discriminator = openai_model.provide(base_temperature=0.3)[0]
+            st.session_state.discriminator = LLMFactory.openai(temperature=0.3)
             
         discriminator = st.session_state.discriminator
         results = {rag: None for rag in rags_to_use}

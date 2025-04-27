@@ -9,3 +9,4 @@ pandas
 ragas
 streamlit
 beautifulsoup4
+pydantic

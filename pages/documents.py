@@ -1,8 +1,9 @@
-from gui.elements.nav_menu import provide_sidebar
-from pathlib import Path
-import streamlit as st
-from components.vector_store import VectorStoreProvider
 from typing import Optional
+
+import streamlit as st
+
+from components.vector_store import VectorStoreProvider
+from gui.elements.nav_menu import provide_sidebar
 
 provide_sidebar()
 

@@ -1,11 +1,14 @@
-from dataclasses import dataclass, field
-from typing import Literal, Optional
-from abc import ABC
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.llms.koboldai import KoboldApiLLM
-from .validation_methods import *
-from .logger import Logger
+from typing import Optional
 import os
+from abc import ABC
+from typing import Optional
+
+from langchain_community.llms.koboldai import KoboldApiLLM
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+from .logger import Logger
+from .validation_methods import *
+
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 
 logger = Logger()

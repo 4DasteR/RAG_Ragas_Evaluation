@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Set, Tuple, Literal, List
+
 from .validation_methods import *
 
 SEMANTIC_UNITS: Tuple[str, ...] = ('paragraphs', 'sentences', 'words')
