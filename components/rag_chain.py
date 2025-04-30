@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Optional, Union, List, Callable, Dict
+from typing import Optional, Union, List, Callable, Dict, Literal
 
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
@@ -87,13 +87,14 @@ class RAG(ABC):
             logger.log("RAG chain created.", "COMPLETED")
         return self.__chain
     
-    def query(self, query: Union[str, Query]) -> Dict[str, Union[str, List[Document]]]:
+    def query(self, query: Union[str, Query]) -> Dict[Literal["query", "answer", "source_documents"], Union[str, List[Document]]]:
         if isinstance(query, Query):
             query = query.text
         
         if not isinstance(query, str) and len(query.strip()) == 0:
             raise ValueError("Query must be provided as a nonempty string!")
         
+        logger.log(f"Asking the query to {type(self).__name__}", "QUERY")
         result = self.chain.invoke(query)
         
         return {

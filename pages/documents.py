@@ -10,7 +10,7 @@ provide_sidebar()
 vectorstoreprovider: Optional[VectorStoreProvider] = st.session_state.vectorstoreprovider
 
 
-if (files := st.file_uploader("Upload new documents", type=["pdf", "txt", "html", "md"], accept_multiple_files=True)):
+if (files := st.file_uploader("Upload new documents", type=["pdf", "txt", "html", "md", "docx", "pptx"], accept_multiple_files=True)):
     for file in files:
         with open(f"{vectorstoreprovider.documents_path}/{file.name}", 'wb') as f:
             f.write(file.getbuffer())

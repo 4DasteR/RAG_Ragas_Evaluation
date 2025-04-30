@@ -26,8 +26,10 @@ def main():
     if 'rags_instances' not in st.session_state:
         st.session_state.rags_instances = {}
     
-    if not st.session_state.llm or not st.session_state.embedding:
+    if not st.session_state.llm:
         st.session_state.llm = LLMFactory.openai()
+
+    if not st.session_state.embedding:
         st.session_state.embedding = provide_openai_embeddings()
         
     llm = st.session_state.llm
@@ -114,8 +116,7 @@ def main():
         for rag in rags_to_use:
             instance = rags_instances[rag]
             with st.spinner(f"Evaluating for rag: {rag}..."):
-                evaluator = Evaluator(instance, discriminator, [st.session_state.query])
-                results[rag] = evaluator.evaluate()
+                results[rag] = evaluate_query(instance, discriminator, st.session_state.query)
         st.session_state.query = None
         
         for rag_name, eval_res in results.items():

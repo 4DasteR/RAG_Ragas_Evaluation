@@ -5,7 +5,7 @@ from typing import List, Optional, Set, Dict, Type
 
 from langchain.retrievers import EnsembleRetriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader, TextLoader, BSHTMLLoader, UnstructuredMarkdownLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, BSHTMLLoader, UnstructuredMarkdownLoader, UnstructuredWordDocumentLoader, UnstructuredPowerPointLoader
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents.base import Document
@@ -46,6 +46,8 @@ class VectorStoreProvider:
         ".txt": TextLoader,
         ".html": BSHTMLLoader,
         ".md": UnstructuredMarkdownLoader,
+        ".docx": UnstructuredWordDocumentLoader,
+        ".pptx": UnstructuredPowerPointLoader,
     })
 
     def __post_init__(self):

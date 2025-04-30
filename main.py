@@ -2,8 +2,11 @@ from dotenv import load_dotenv
 
 from components.evaluator import Evaluator
 from components.models_provider import LLMFactory, provide_openai_embeddings
-from components.query_builder import QueryBuilder
-from components.rag_chain import *
+from components.vector_store import VectorStoreProvider
+from components.query_builder import QueryBuilder, Query
+from components.rag_chain import RAGFactory
+
+from typing import List
 
 if __name__ == "__main__":
     load_dotenv()
@@ -58,8 +61,28 @@ if __name__ == "__main__":
         
     metrics = ['context_recall', 'faithfulness', 'factual_correctness(mode=f1)']
 
+    rags_eval = dict()
     discriminator = LLMFactory.openai(temperature=0.3)
-    test_q = QueryBuilder().text("What is a perceptron?").ground_truth_answer(ground_truth_answers[0]).zero_shot().chain_of_thought().build()
-    evaluator = Evaluator(rags['simple'], discriminator, [test_q])
-    res = evaluator.evaluate()
-    print(res)
+    for rag, instance in rags.items():
+        evaluator = Evaluator(instance, discriminator, engineered_queries)
+        rags_eval[f"{rag}"] = evaluator.evaluate()
+    import pandas as pd
+    metrics = ['context_recall', 'faithfulness', 'factual_correctness(mode=f1)']
+    for rag_name, eval_res in rags_eval.items():
+        print(f"\nSummary for: {rag_name}")
+
+        # Create a dictionary to hold per-metric, per-question mean values
+        summary = {}
+
+        # Iterate over questions
+        for q_n, df in eval_res.items():
+            means = df[metrics].mean()  # Mean of each metric in the DataFrame
+            for metric, val in means.items():
+                summary.setdefault(metric, {})[q_n] = val  # Fill metric row with question value
+
+        # Create summary DataFrame
+        summary_df = pd.DataFrame(summary).T  # Metrics as rows
+        summary_df.index.name = "Metric"
+        summary_df = summary_df.reset_index()
+
+        print(summary_df)

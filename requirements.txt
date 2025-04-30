@@ -10,3 +10,5 @@ ragas
 streamlit
 beautifulsoup4
 pydantic
+unstructured
+python-pptx
