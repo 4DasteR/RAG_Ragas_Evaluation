@@ -7,7 +7,7 @@ from langchain_community.llms.koboldai import KoboldApiLLM
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from .logger import Logger
-from .validation_methods import *
+from .validation_methods import validate_string
 
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 
@@ -82,7 +82,15 @@ class LLMFactory(ABC):
         logger.log(f"Provided Kobold LLM model from API: {kobold_api}", 'AI_MODEL')
         return KoboldApiLLM(endpoint=kobold_api, temperature=temperature, max_length=max_length)
     
-def provide_openai_embeddings():
+def provide_openai_embeddings() -> OpenAIEmbeddings:
+    """Provides OpenAI embedding model
+
+    Raises:
+        ValueError: Please provide OPENAI_API_KEY to the .env file!
+
+    Returns:
+        OpenAIEmbeddings: OpenAI embedding model
+    """
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         raise ValueError("Please provide OPENAI_API_KEY to the .env file!")

@@ -8,12 +8,14 @@ from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain_core.documents.base import Document
 from langchain_core.language_models.llms import LLM
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.retrievers import BaseRetriever
 from pydantic import BaseModel
 
 from .logger import Logger
 from .query_builder import Query
 from .vector_store import VectorStoreProvider
+from .validation_methods import validate_string, validate_llm
 
 DEFAULT_PROMPT_TEMPLATE = """You are an AI assistant for question-answering tasks.
 Use the following pieces of retrieved context to answer the question.
@@ -51,17 +53,26 @@ class RAG(ABC):
     Abstract class representing a RAG.
 
     Attributes:
-        llm (LLM): llm model used for querying
+        llm (LLM | BaseChatModel): llm model used for querying
         retriever (BaseRetriever): retriever for vectorstore data
         prompt_template (str): template of a prompt enriched with query and context from chain
     """
-    llm: LLM
+    llm: Union[LLM, BaseChatModel]
     retriever: BaseRetriever
     prompt_template: str
     __chain: Optional[RetrievalQA] = field(default=None, init=False)
     __last_retriever_hash: int = field(default=-1, init=False)
     
     def __post_init__(self):
+        if not validate_llm(self.llm):
+            raise ValueError("LLM must be of type LLM or BaseChatModel!")
+        
+        if not isinstance(self.retriever, BaseRetriever):
+            raise ValueError("Retriever must be a valid BaseRetriever!")
+        
+        if not validate_string(self.prompt_template):
+            raise ValueError("Prompt template must be a valid string!")
+        
         logger.log(f"Created {type(self).__name__}.", "COMPLETED")
         self.__rag_prompt = PromptTemplate(
             template=self.prompt_template,
@@ -91,7 +102,7 @@ class RAG(ABC):
         if isinstance(query, Query):
             query = query.text
         
-        if not isinstance(query, str) and len(query.strip()) == 0:
+        if not validate_string(query):
             raise ValueError("Query must be provided as a nonempty string!")
         
         logger.log(f"Asking the query to {type(self).__name__}", "QUERY")
@@ -132,7 +143,7 @@ class RAGFactory(ABC):
     Factory class used for generating Simple, Compression and Hybrid RAGs.
     """
     @staticmethod
-    def __validate_inputs(llm: LLM, provider: VectorStoreProvider, prompt_template: str):
+    def __validate_inputs(llm: Union[LLM, BaseChatModel], provider: VectorStoreProvider, prompt_template: str):
         if not llm:
             raise ValueError("LLM must be provided!")
         if not provider:
@@ -142,30 +153,61 @@ class RAGFactory(ABC):
     
     @staticmethod
     def create_simple(
-        llm: LLM,
+        llm: Union[LLM, BaseChatModel],
         provider: VectorStoreProvider,
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE
     ) -> RAG:
+        """Creates a simple RAG
+
+        Args:
+            llm (LLM | BaseChatModel): llm model used for querying
+            provider (VectorStoreProvider): vectorstore provider for access to dense retriever
+            prompt_template (str, optional): prompt template for RAG. Defaults to DEFAULT_PROMPT_TEMPLATE.
+
+        Returns:
+            RAG: Simple RAG
+        """
         RAGFactory.__validate_inputs(llm, provider, prompt_template)
         retriever_callable = lambda: provider.dense_retriever
         return SimpleRAG(llm, RetrieverProxy(retriever_callable=retriever_callable), prompt_template)
     
     @staticmethod
     def create_compression(
-        llm: LLM,
+        llm: Union[LLM, BaseChatModel],
         provider: VectorStoreProvider,
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE
     ) -> RAG:
+        """Creates a compression RAG. 
+        Compression RAG uses ContextualCompressionRetriever on the provided retriever.
+
+        Args:
+            llm (LLM | BaseChatModel): llm model used for querying
+            provider (VectorStoreProvider): vectorstore provider for access to dense retriever
+            prompt_template (str, optional): prompt template for RAG. Defaults to DEFAULT_PROMPT_TEMPLATE.
+
+        Returns:
+            RAG: Compression RAG
+        """
         RAGFactory.__validate_inputs(llm, provider, prompt_template)
         retriever_callable = lambda: provider.dense_retriever
         return CompressionRAG(llm, RetrieverProxy(retriever_callable=retriever_callable), prompt_template)
     
     @staticmethod
     def create_hybrid(
-        llm: LLM,
+        llm: Union[LLM, BaseChatModel],
         provider: VectorStoreProvider,
         prompt_template: str = DEFAULT_PROMPT_TEMPLATE
     ) -> RAG:
+        """Creates a RAG that uses two retrievers based on their ensembling weights.
+
+        Args:
+            llm (LLM | BaseChatModel): llm model used for querying
+            provider (VectorStoreProvider): vectorstore provider for access to dense and sparse retrievers
+            prompt_template (str, optional): prompt template for RAG. Defaults to DEFAULT_PROMPT_TEMPLATE.
+
+        Returns:
+            RAG: Hybrid RAG
+        """
         RAGFactory.__validate_inputs(llm, provider, prompt_template)
         retriever_callable = lambda: provider.ensemble_retriever
         return HybridRAG(llm, RetrieverProxy(retriever_callable=retriever_callable), prompt_template)

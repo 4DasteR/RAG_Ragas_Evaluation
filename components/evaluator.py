@@ -1,10 +1,11 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Literal, Union
 
 import pandas as pd
-from langchain_openai import ChatOpenAI
+from langchain_core.language_models.llms import LLM
+from langchain_core.language_models.chat_models import BaseChatModel
 from pandas import DataFrame
 from ragas import EvaluationDataset, evaluate
 from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
@@ -12,6 +13,7 @@ from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
 from .logger import Logger
 from .query_builder import Query
 from .rag_chain import RAG
+from .validation_methods import validate_llm
 
 logger = Logger()
 
@@ -26,7 +28,7 @@ class Evaluator:
         engineered_queries(List[Query]): list of engineered queries for evaluation
     """
     rag: RAG
-    discriminator: ChatOpenAI
+    discriminator: Union[LLM, BaseChatModel]
     engineered_queries: List[Query] = field(default_factory=list)
     __results_folder: Path = Path("results")
     __evaluation_results: Optional[Dict[str, DataFrame]] = None
@@ -36,15 +38,18 @@ class Evaluator:
     def __post_init__(self):
         if not isinstance(self.rag, RAG):
             raise ValueError("RAG system must be provided!")
+        
+        if not validate_llm(self.discriminator):
+            raise ValueError("The discriminator must be of type LLM or BaseChatModel!")
 
-        if not isinstance(self.engineered_queries, List) or any([not isinstance(q, Query) for q in self.engineered_queries]):
-            raise ValueError("Engineered queries must be provided as a list of Query objects!")
+        if not isinstance(self.engineered_queries, list) or len(self.engineered_queries) == 0 or any([not isinstance(q, Query) for q in self.engineered_queries]):
+            raise ValueError("Engineered queries must be provided as a nonempty list of Query objects!")
 
         self.__results_folder.mkdir(exist_ok=True)
         logger.log(f"Evaluator for {type(self.rag).__name__} created.", "completed")
     
     @property
-    def evaluation_list(self) -> List[List[Dict[str, str]]]:
+    def evaluation_list(self) -> List[List[Dict[Literal["question", "answer", "context", "ground_truth"], Union[str, List[str]]]]]:
         """
         Returns a list of prepared queries for later use in evaluator
         """
@@ -86,7 +91,7 @@ class Evaluator:
     
     @property
     def evaluation_results(self):
-        if not self.__evaluation_results:
+        if self.__evaluation_results is None:
             self.evaluate()
         return self.__evaluation_results
 

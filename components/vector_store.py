@@ -13,6 +13,7 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_openai import OpenAIEmbeddings
 
 from .logger import Logger
+from .validation_methods import validate_string
 
 logger = Logger()
 
@@ -70,7 +71,7 @@ class VectorStoreProvider:
             raise ValueError("Chunk overlap mustn't be bigger or equal the size of chunk!")
 
         if not isinstance(self.documents_path, Path):
-            if not isinstance(self.documents_path, str):
+            if not validate_string(self.documents_path):
                 raise ValueError("Path to documents must be a Path object!")
             else:
                 self.documents_path = Path(self.documents_path)

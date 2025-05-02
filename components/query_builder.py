@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Set, Tuple, Literal, List
 
-from .validation_methods import *
+from .validation_methods import validate_string
 
 SEMANTIC_UNITS: Tuple[str, ...] = ('paragraphs', 'sentences', 'words')
 ALL_TECHNIQUES: Tuple[str, ...] = ('Zero-Shot', 'Chain of Thought', 'Role Prompting', 'Self Consistency', 'Directional Stimulus')
@@ -27,7 +27,7 @@ class QueryBuilder():
     __query_text: str = field(default=None, init=False)
     __ground_truth_answer: Optional[str] = field(default=None, init=False)
     __techniques_used: Set[Literal['zero_shot', 'chain_of_thought', 'role_prompting', 'self_consistency', 'directional_stimulus']] = field(init=False, default_factory=set)
-    __zero_shot: Tuple[int, int, Literal['paragraphs', 'sentences', 'words']] = field(init=False, default_factory=lambda: (1, 3, "paragraphs"))
+    __zero_shot: Tuple[int, int, Literal['paragraphs', 'sentences', 'words']] = field(init=False, default=(1, 3, "paragraphs"))
     __role_prompting: Optional[str] = field(init=False, default=None)
     __self_consistency: int = field(init=False, default=2)
     __directional_stimulus: List[str] = field(init=False, default_factory=list)
