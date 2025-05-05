@@ -118,7 +118,9 @@ class VectorStoreProvider:
 
     def __load_and_split_documents(self) -> List[Document]:
         if self.__documents_changed_check() or not hasattr(self, '__chunks'):
-            self.__chunks = list(chain.from_iterable(self.__load_and_split_document(doc) for doc in self.__cached_documents))
+            if len(self.documents_files) == 0:
+                raise ValueError("There must be at least one document in documents folder!")
+            self.__chunks = list(chain.from_iterable(self.__load_and_split_document(doc) for doc in self.__cached_documents.keys()))
         return self.__chunks
 
     @property
