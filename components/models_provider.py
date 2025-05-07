@@ -1,13 +1,18 @@
 from typing import Optional
 import os
 from abc import ABC
-from typing import Optional
+from typing import Optional, List
+from dataclasses import dataclass
+from pathlib import Path
 
+from langchain_core.embeddings import Embeddings
 from langchain_community.llms.koboldai import KoboldApiLLM
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from .logger import Logger
 from .validation_methods import validate_string
+from sentence_transformers import SentenceTransformer
+import numpy as np
 
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 
@@ -82,6 +87,21 @@ class LLMFactory(ABC):
         logger.log(f"Provided Kobold LLM model from API: {kobold_api}", 'AI_MODEL')
         return KoboldApiLLM(endpoint=kobold_api, temperature=temperature, max_length=max_length)
     
+
+@dataclass
+class LocalEmbeddingModel(Embeddings):
+    model_path: str = "sentence-transformers/all-MiniLM-L6-v2"
+    
+    def __post_init__(self):
+        self.model = SentenceTransformer(self.model_path)
+        # logger.log(f"Loaded local embedding model from {self.model_path.name}", "AI_MODEL")
+        
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self.model.encode(texts, convert_to_numpy=True).tolist()
+
+    def embed_query(self, text: str) -> List[float]:
+        return self.model.encode([text], convert_to_numpy=True)[0].tolist()
+    
 def provide_openai_embeddings() -> OpenAIEmbeddings:
     """Provides OpenAI embedding model
 
@@ -97,3 +117,6 @@ def provide_openai_embeddings() -> OpenAIEmbeddings:
     
     logger.log("Provided OpenAI embedding model", 'AI_MODEL')
     return OpenAIEmbeddings(api_key=openai_api_key, model=OPENAI_EMBEDDING_MODEL)
+
+def provide_custom_embeddings(model_path: Path = None) -> LocalEmbeddingModel:
+    return LocalEmbeddingModel()
