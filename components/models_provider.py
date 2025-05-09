@@ -101,7 +101,59 @@ class EmbeddingFactory(ABC):
         return OpenAIEmbeddings(api_key=openai_api_key, model=OPENAI_EMBEDDING_MODEL)
     
     @staticmethod
-    def huggingface(model_name = "sentence-transformers/all-MiniLM-L6-v2", normalize: bool = False) -> HuggingFaceEmbeddings:
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {'normalize_embeddings': normalize}
-        return HuggingFaceEmbeddings(model_name=model_name,model_kwargs=model_kwargs, encode_kwargs=encode_kwargs)
+    def huggingface(
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        normalize: bool = False,
+        device: str = "cpu",
+        cache_folder: Optional[str] = None,
+        encode_kwargs: Optional[dict] = None,
+        model_kwargs: Optional[dict] = None
+    ) -> HuggingFaceEmbeddings:
+        """Provides a HuggingFace embedding model according to given parameters.
+
+        Args:
+            model_name (str, optional): Name or path of the HuggingFace model. 
+                Defaults to "sentence-transformers/all-MiniLM-L6-v2".
+            normalize (bool, optional): Whether to normalize embeddings. Defaults to False.
+            device (str, optional): Device to run the model on (e.g., "cpu", "cuda"). 
+                Defaults to "cpu".
+            cache_folder (str, optional): Path to cache folder for the model. 
+                Defaults to None.
+            encode_kwargs (dict, optional): Additional kwargs for encoding. 
+                Defaults to None (will use normalize_embeddings).
+            model_kwargs (dict, optional): Additional kwargs for model initialization. 
+                Defaults to None (will use device).
+
+        Raises:
+            ValueError: Model name must be a nonempty string!
+            ValueError: Device must be a nonempty string!
+            ValueError: Cache folder path must be a string if provided!
+
+        Returns:
+            HuggingFaceEmbeddings: HuggingFace embedding model
+        """
+        if not validate_string(model_name):
+            raise ValueError("Model name must be a nonempty string!")
+        
+        if not validate_string(device) or device is not 'cpu':
+            raise ValueError("Device must be a nonempty string!")
+        
+        if cache_folder is not None and not isinstance(cache_folder, str):
+            raise ValueError("Cache folder path must be a string if provided!")
+
+        if model_kwargs is None:
+            model_kwargs = {'device': device}
+        if encode_kwargs is None:
+            encode_kwargs = {'normalize_embeddings': normalize}
+
+        kwargs = {
+            'model_name': model_name,
+            'model_kwargs': model_kwargs,
+            'encode_kwargs': encode_kwargs
+        }
+        
+        if cache_folder:
+            kwargs['cache_folder'] = cache_folder
+
+        logger.log(f"Provided HuggingFace embedding model: {model_name}", 'AI_MODEL')
+        return HuggingFaceEmbeddings(**kwargs)
