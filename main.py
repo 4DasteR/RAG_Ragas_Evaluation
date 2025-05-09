@@ -1,18 +1,18 @@
+from typing import List
+
 from dotenv import load_dotenv
 
 from components.evaluator import Evaluator
-from components.models_provider import LLMFactory, provide_openai_embeddings
-from components.vector_store import VectorStoreProvider
+from components.models_provider import LLMFactory, EmbeddingFactory
 from components.query_builder import QueryBuilder, Query
 from components.rag_chain import RAGFactory
-
-from typing import List
+from components.vector_store import VectorStoreProvider
 
 if __name__ == "__main__":
     load_dotenv()
     
     llm = LLMFactory.openai()
-    embedding_engine = provide_openai_embeddings()
+    embedding_engine = EmbeddingFactory.openai()
     vectorstore_provider = VectorStoreProvider(embedding_engine)
     
     rags = {

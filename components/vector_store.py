@@ -5,12 +5,13 @@ from typing import List, Optional, Set, Dict, Type
 
 from langchain.retrievers import EnsembleRetriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader, TextLoader, BSHTMLLoader, UnstructuredMarkdownLoader, UnstructuredWordDocumentLoader, UnstructuredPowerPointLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, BSHTMLLoader, UnstructuredMarkdownLoader, \
+    UnstructuredWordDocumentLoader, UnstructuredPowerPointLoader
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents.base import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_openai import OpenAIEmbeddings
 
 from .logger import Logger
 from .validation_methods import validate_string
@@ -25,14 +26,14 @@ class VectorStoreProvider:
     Supports only TXT and PDF files for documents.
 
     Attributes:
-        embedding_model (OpenAIEmbeddings): model used for text tokenization and embedding
+        embedding_model (Embeddings): model used for text tokenization and embedding
         chunk_size (int): size of document chunk. Default: 1000
         chunk_overlap (int): number of chunk overlaps. Default: 200
         weight_dense (float): The percentage of how much dense retriever is allocated in Ensemble retriever. Default: 0.5
         weight_sparse (float): The percentage of how much sparse retriever is allocated in Ensemble retriever. Default: 0.5
         documents_path (Path): Path to documents directory. Default: Path("documents").
     """
-    embedding_model: OpenAIEmbeddings
+    embedding_model: Embeddings
     k: int = 4
     chunk_size: int = 1000
     chunk_overlap: int = 200

@@ -1,6 +1,8 @@
-from langchain_core.language_models.llms import LLM
-from langchain_core.language_models.chat_models import BaseChatModel
 from typing import Union
+
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.language_models.llms import LLM
+
 
 def validate_string(string: str):
     return isinstance(string, str) and len(string.strip()) > 0

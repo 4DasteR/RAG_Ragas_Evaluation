@@ -1,18 +1,13 @@
-from typing import Optional
 import os
 from abc import ABC
-from typing import Optional, List
-from dataclasses import dataclass
-from pathlib import Path
+from typing import Optional
 
-from langchain_core.embeddings import Embeddings
 from langchain_community.llms.koboldai import KoboldApiLLM
+from langchain_huggingface.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from .logger import Logger
 from .validation_methods import validate_string
-from sentence_transformers import SentenceTransformer
-import numpy as np
 
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 
@@ -87,36 +82,26 @@ class LLMFactory(ABC):
         logger.log(f"Provided Kobold LLM model from API: {kobold_api}", 'AI_MODEL')
         return KoboldApiLLM(endpoint=kobold_api, temperature=temperature, max_length=max_length)
     
+class EmbeddingFactory(ABC):
+    @staticmethod
+    def openai() -> OpenAIEmbeddings:
+        """Provides OpenAI embedding model
 
-@dataclass
-class LocalEmbeddingModel(Embeddings):
-    model_path: str = "sentence-transformers/all-MiniLM-L6-v2"
-    
-    def __post_init__(self):
-        self.model = SentenceTransformer(self.model_path)
-        # logger.log(f"Loaded local embedding model from {self.model_path.name}", "AI_MODEL")
+        Raises:
+            ValueError: Please provide OPENAI_API_KEY to the .env file!
+
+        Returns:
+            OpenAIEmbeddings: OpenAI embedding model
+        """
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise ValueError("Please provide OPENAI_API_KEY to the .env file!")
         
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self.model.encode(texts, convert_to_numpy=True).tolist()
-
-    def embed_query(self, text: str) -> List[float]:
-        return self.model.encode([text], convert_to_numpy=True)[0].tolist()
+        logger.log("Provided OpenAI embedding model", 'AI_MODEL')
+        return OpenAIEmbeddings(api_key=openai_api_key, model=OPENAI_EMBEDDING_MODEL)
     
-def provide_openai_embeddings() -> OpenAIEmbeddings:
-    """Provides OpenAI embedding model
-
-    Raises:
-        ValueError: Please provide OPENAI_API_KEY to the .env file!
-
-    Returns:
-        OpenAIEmbeddings: OpenAI embedding model
-    """
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        raise ValueError("Please provide OPENAI_API_KEY to the .env file!")
-    
-    logger.log("Provided OpenAI embedding model", 'AI_MODEL')
-    return OpenAIEmbeddings(api_key=openai_api_key, model=OPENAI_EMBEDDING_MODEL)
-
-def provide_custom_embeddings(model_path: Path = None) -> LocalEmbeddingModel:
-    return LocalEmbeddingModel()
+    @staticmethod
+    def huggingface(model_name = "sentence-transformers/all-MiniLM-L6-v2", normalize: bool = False) -> HuggingFaceEmbeddings:
+        model_kwargs = {'device': 'cpu'}
+        encode_kwargs = {'normalize_embeddings': normalize}
+        return HuggingFaceEmbeddings(model_name=model_name,model_kwargs=model_kwargs, encode_kwargs=encode_kwargs)

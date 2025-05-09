@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import List, Dict, Optional, Literal, Union
 
 import pandas as pd
-from langchain_core.language_models.llms import LLM
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.language_models.llms import LLM
 from pandas import DataFrame
 from ragas import EvaluationDataset, evaluate
 from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness

@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional
 
-from components.query_builder import QueryBuilder, Query
 from components.evaluator import Evaluator
+from components.query_builder import QueryBuilder, Query
 
 
 def create_query(text: str, ground_truth: Optional[str], techniques: Dict[str, Any]) -> Query:

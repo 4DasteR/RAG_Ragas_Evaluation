@@ -7,15 +7,15 @@ from langchain.prompts import PromptTemplate
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain_core.documents.base import Document
-from langchain_core.language_models.llms import LLM
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.language_models.llms import LLM
 from langchain_core.retrievers import BaseRetriever
 from pydantic import BaseModel
 
 from .logger import Logger
 from .query_builder import Query
-from .vector_store import VectorStoreProvider
 from .validation_methods import validate_string, validate_llm
+from .vector_store import VectorStoreProvider
 
 DEFAULT_PROMPT_TEMPLATE = """You are an AI assistant for question-answering tasks.
 Use the following pieces of retrieved context to answer the question.

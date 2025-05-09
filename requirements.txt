@@ -13,3 +13,4 @@ pydantic
 unstructured
 python-pptx
 sentence-transformers
+langchain_huggingface

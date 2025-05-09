@@ -1,9 +1,9 @@
 import streamlit as st
 from dotenv import load_dotenv
 
+from components.logger import Logger
 from components.models_provider import LLMFactory, provide_openai_embeddings
 from components.rag_chain import RAGFactory
-from components.logger import Logger
 from components.vector_store import VectorStoreProvider
 from gui.elements.nav_menu import provide_sidebar
 from gui.elements.techniques_menu import provide_techniques_menu

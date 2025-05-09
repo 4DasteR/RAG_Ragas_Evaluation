@@ -1,6 +1,7 @@
-from typing import Optional
-import streamlit as st
 import os
+from typing import Optional
+
+import streamlit as st
 
 from components.models_provider import provide_openai_embeddings
 from components.vector_store import VectorStoreProvider
